@@ -12,6 +12,36 @@ final class SecurityGuardrailTests: XCTestCase {
         XCTAssertEqual(result.risk, .destructive)
     }
 
+    func testCommandSandboxPermanentlyBlocksRootAndHomeRmVariants() {
+        let commands = [
+            "rm -rf /",
+            "rm -fr /",
+            "rm -r -f /",
+            "rm --recursive --force /",
+            "rm -rf -- /",
+            "sudo rm -rf /",
+            "rm -rf ~",
+            "rm -rf ~/ ",
+            "rm -rf \"$HOME\"",
+            "rm -rf \"$HOME/\"",
+            "rm -rf ${HOME}",
+            "rm -rf '${HOME}/'"
+        ]
+
+        for command in commands {
+            let result = CommandSandbox().validate(command)
+
+            XCTAssertFalse(result.isAllowed, command)
+            XCTAssertFalse(result.requiresApproval, command)
+            XCTAssertEqual(result.risk, .destructive, command)
+
+            let allowAll = PermissionGate(mode: .allowAll).evaluate(.shell(command: command))
+            XCTAssertFalse(allowAll.isAllowed, command)
+            XCTAssertFalse(allowAll.requiresUserApproval, command)
+            XCTAssertEqual(allowAll.risk, .destructive, command)
+        }
+    }
+
     func testCommandSandboxRequiresApprovalForDestructiveCommands() {
         let result = CommandSandbox().validate("chmod 777 ./script/build_and_run.sh")
 
@@ -104,5 +134,12 @@ final class SecurityGuardrailTests: XCTestCase {
         let sanitized = TerminalInputSanitizer.sanitize(input)
 
         XCTAssertEqual(sanitized, "safe\u{001B}[31mred\u{001B}[0m")
+    }
+
+    func testAIOutputSanitizerStripsWindowTitleAndClipboardOSCBeforeDisplay() {
+        let input = "hi\u{001B}]0;evil-title\u{0007}\u{001B}]52;c;clipboard\u{0007}plain text"
+        let sanitized = AIOutputSanitizer.sanitize(input)
+
+        XCTAssertEqual(sanitized, "hiplain text")
     }
 }

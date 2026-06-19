@@ -1,3 +1,5 @@
 .build/
 .playwright-mcp/
 .DS_Store
+.claude_codex_skill_audit_2026-06-19.md
+.serena/

@@ -1,4 +1,5 @@
 import Foundation
+import WarpCLICore
 
 enum BlockStatus: String, Codable, CaseIterable, Equatable {
     case running
@@ -36,7 +37,7 @@ struct TerminalBlock: Identifiable, Codable, Equatable {
     ) {
         self.id = id
         self.command = command
-        self.rawOutput = rawOutput
+        self.rawOutput = AIOutputSanitizer.sanitize(rawOutput)
         self.status = status
         self.startedAt = startedAt
         self.endedAt = endedAt
@@ -183,6 +184,8 @@ struct MCPServer: Identifiable, Codable, Equatable {
     var arguments: [String]
     var status: MCPStatus
     var configPath: String
+    var descriptorHash: String
+    var isApproved: Bool
 
     init(
         id: UUID = UUID(),
@@ -190,7 +193,9 @@ struct MCPServer: Identifiable, Codable, Equatable {
         command: String,
         arguments: [String] = [],
         status: MCPStatus = .stopped,
-        configPath: String
+        configPath: String,
+        descriptorHash: String = "",
+        isApproved: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -198,6 +203,8 @@ struct MCPServer: Identifiable, Codable, Equatable {
         self.arguments = arguments
         self.status = status
         self.configPath = configPath
+        self.descriptorHash = descriptorHash
+        self.isApproved = isApproved
     }
 }
 

@@ -5,6 +5,7 @@ struct InspectorView: View {
     @Binding var selectedTab: InspectorTab
     @EnvironmentObject private var git: GitService
     @EnvironmentObject private var mcp: MCPManager
+    @State private var pendingMCPApproval: MCPServer?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,6 +36,29 @@ struct InspectorView: View {
             .background(.thinMaterial)
         }
         .frame(minWidth: 300, idealWidth: 360, maxWidth: 480)
+        .sheet(item: $pendingMCPApproval) { server in
+            PermissionApprovalView(
+                title: "Approve MCP Server?",
+                message: "\(server.name) wants to run \(server.command). Approved descriptor hashes persist until removed from settings or app data.",
+                command: ([server.command] + server.arguments).joined(separator: " "),
+                risk: .unknown,
+                onAllowOnce: {
+                    mcp.approve(server)
+                    mcp.start(server)
+                    pendingMCPApproval = nil
+                },
+                onDeny: {
+                    mcp.deny(server)
+                    pendingMCPApproval = nil
+                },
+                onEditCommand: nil,
+                onAlwaysAllow: {
+                    mcp.approve(server)
+                    mcp.start(server)
+                    pendingMCPApproval = nil
+                }
+            )
+        }
     }
 
     private var codeReviewPanel: some View {
@@ -126,7 +150,13 @@ struct InspectorView: View {
                             MCPServerRow(
                                 server: server,
                                 log: mcp.logs[server.id],
-                                onStart: { mcp.start(server) },
+                                onStart: {
+                                    if server.isApproved {
+                                        mcp.start(server)
+                                    } else {
+                                        pendingMCPApproval = server
+                                    }
+                                },
                                 onStop: { mcp.stop(server) },
                                 onRestart: { mcp.restart(server) },
                                 onRemove: { mcp.remove(server) }

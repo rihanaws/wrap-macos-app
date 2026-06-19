@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import WarpCLICore
 
 @MainActor
@@ -10,6 +11,15 @@ final class MCPManager: ObservableObject {
     private let securityPolicy = MCPSecurityPolicy()
     private let rateLimiter = MCPRateLimiter()
     private let auditLogger = AuditLogger()
+    private let approvedHashesKey = "warpclone_mcp_approved_descriptor_hashes"
+    private var approvedDescriptorHashes: Set<String>
+
+    init(userDefaults: UserDefaults = .standard) {
+        approvedDescriptorHashes = Set(userDefaults.stringArray(forKey: approvedHashesKey) ?? [])
+        self.userDefaults = userDefaults
+    }
+
+    private let userDefaults: UserDefaults
 
     func discover() {
         let paths = defaultConfigPaths()
@@ -42,6 +52,18 @@ final class MCPManager: ObservableObject {
 
     func start(_ server: MCPServer) {
         guard processes[server.id] == nil else { return }
+        guard hasApprovedDescriptor(for: server) else {
+            update(server.id, status: .discovered)
+            logs[server.id] = "MCP server must be approved before it can start."
+            auditLogger.append(AuditLogEntry(
+                action: .mcpServerRejected,
+                source: .app,
+                risk: .unknown,
+                subject: server.name,
+                detail: "Start denied for unapproved descriptor \(server.descriptorHash)"
+            ))
+            return
+        }
         guard server.command != "config" else {
             update(server.id, status: .failed)
             logs[server.id] = "This entry is a config marker, not a runnable MCP server."
@@ -94,6 +116,38 @@ final class MCPManager: ObservableObject {
         }
     }
 
+    func approve(_ server: MCPServer) {
+        guard !server.descriptorHash.isEmpty else {
+            deny(server, reason: "Missing MCP descriptor hash.")
+            return
+        }
+
+        approvedDescriptorHashes.insert(server.descriptorHash)
+        persistApprovedDescriptorHashes()
+        if let index = servers.firstIndex(where: { $0.id == server.id }) {
+            servers[index].isApproved = true
+        }
+        logs[server.id] = "Approved \(server.name)."
+        auditLogger.append(AuditLogEntry(
+            action: .mcpServerApproved,
+            source: .app,
+            risk: .unknown,
+            subject: server.name,
+            detail: "Approved descriptor \(server.descriptorHash)"
+        ))
+    }
+
+    func deny(_ server: MCPServer, reason: String = "User denied MCP server approval.") {
+        logs[server.id] = reason
+        auditLogger.append(AuditLogEntry(
+            action: .mcpServerRejected,
+            source: .app,
+            risk: .unknown,
+            subject: server.name,
+            detail: reason
+        ))
+    }
+
     func stop(_ server: MCPServer) {
         processes[server.id]?.terminate()
         processes[server.id] = nil
@@ -132,6 +186,25 @@ final class MCPManager: ObservableObject {
         servers[index].status = status
     }
 
+    private func hasApprovedDescriptor(for server: MCPServer) -> Bool {
+        !server.descriptorHash.isEmpty && approvedDescriptorHashes.contains(server.descriptorHash)
+    }
+
+    private func persistApprovedDescriptorHashes() {
+        userDefaults.set(Array(approvedDescriptorHashes).sorted(), forKey: approvedHashesKey)
+    }
+
+    private func descriptorHash(name: String, command: String, arguments: [String], configPath: String) -> String {
+        let descriptor = [
+            name,
+            command,
+            arguments.joined(separator: "\u{1F}"),
+            configPath
+        ].joined(separator: "\u{1E}")
+        let digest = SHA256.hash(data: Data(descriptor.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
     private func defaultConfigPaths() -> [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return [
@@ -163,12 +236,21 @@ final class MCPManager: ObservableObject {
 
             let args = config["args"] as? [String] ?? []
             let hash = securityPolicy.descriptorHash(name: name, command: command, arguments: args)
+            let configPath = "\(path)#\(hash)"
+            let descriptorHash = descriptorHash(
+                name: name,
+                command: command,
+                arguments: args,
+                configPath: configPath
+            )
             return MCPServer(
                 name: name,
                 command: command,
                 arguments: args,
                 status: .discovered,
-                configPath: "\(path)#\(hash)"
+                configPath: configPath,
+                descriptorHash: descriptorHash,
+                isApproved: approvedDescriptorHashes.contains(descriptorHash)
             )
         }
     }

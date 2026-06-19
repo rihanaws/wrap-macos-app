@@ -12,6 +12,7 @@ final class PTYSession {
         case unlockFailed
         case missingSlaveName
         case forkFailed
+        case alreadyActive
 
         var errorDescription: String? {
             switch self {
@@ -20,6 +21,7 @@ final class PTYSession {
             case .unlockFailed: "Failed to unlock pseudo-terminal."
             case .missingSlaveName: "Failed to resolve pseudo-terminal slave name."
             case .forkFailed: "Failed to fork shell process."
+            case .alreadyActive: "PTY session is already active."
             }
         }
     }
@@ -27,7 +29,7 @@ final class PTYSession {
     private(set) var masterFD: Int32 = -1
     private(set) var childPID: pid_t = -1
     private let readQueue = DispatchQueue(label: "warpclone.pty.read", qos: .userInitiated)
-    private var isReading = false
+    private var readSource: DispatchSourceRead?
 
     func spawn(
         shellPath: String,
@@ -35,6 +37,10 @@ final class PTYSession {
         onOutput: @escaping @Sendable (String) -> Void,
         onExit: @escaping @Sendable (Int32) -> Void
     ) throws {
+        guard masterFD < 0 && childPID < 0 && readSource == nil else {
+            throw PTYError.alreadyActive
+        }
+
         masterFD = posix_openpt(O_RDWR | O_NOCTTY)
         guard masterFD >= 0 else { throw PTYError.openFailed }
         guard grantpt(masterFD) == 0 else { throw PTYError.grantFailed }
@@ -99,40 +105,62 @@ final class PTYSession {
             close(masterFD)
             masterFD = -1
         }
-        isReading = false
+        readSource?.cancel()
+        readSource = nil
     }
 
     private func beginReadLoop(
         onOutput: @escaping @Sendable (String) -> Void,
         onExit: @escaping @Sendable (Int32) -> Void
     ) {
-        isReading = true
         let fd = masterFD
         let pid = childPID
-        readQueue.async { [weak self] in
+
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: readQueue)
+        source.setEventHandler { [weak self] in
             var buffer = [UInt8](repeating: 0, count: 4096)
-            while self?.isReading == true {
-                let count = Darwin.read(fd, &buffer, buffer.count)
-                if count > 0 {
-                    let data = Data(buffer[0..<count])
-                    if let text = String(data: data, encoding: .utf8) {
-                        onOutput(text)
-                    }
-                } else {
-                    break
-                }
+            let count = Darwin.read(fd, &buffer, buffer.count)
+            guard count > 0 else {
+                self?.finishReadSource(fd: fd, pid: pid, onExit: onExit)
+                return
             }
 
-            var status: Int32 = 0
-            waitpid(pid, &status, 0)
-            let exitCode: Int32
-            if (status & 0x7F) == 0 {
-                exitCode = (status >> 8) & 0xFF
-            } else {
-                exitCode = -1
+            let data = Data(buffer[0..<count])
+            if let text = String(data: data, encoding: .utf8) {
+                onOutput(text)
             }
-            onExit(exitCode)
         }
+        source.setCancelHandler { }
+        readSource = source
+        source.resume()
+    }
+
+    private func finishReadSource(
+        fd: Int32,
+        pid: pid_t,
+        onExit: @escaping @Sendable (Int32) -> Void
+    ) {
+        readSource?.cancel()
+        readSource = nil
+
+        if masterFD == fd {
+            Darwin.close(fd)
+            masterFD = -1
+        }
+
+        var status: Int32 = 0
+        waitpid(pid, &status, 0)
+        if childPID == pid {
+            childPID = -1
+        }
+
+        let exitCode: Int32
+        if (status & 0x7F) == 0 {
+            exitCode = (status >> 8) & 0xFF
+        } else {
+            exitCode = -1
+        }
+        onExit(exitCode)
     }
 
     deinit {

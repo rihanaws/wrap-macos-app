@@ -17,4 +17,14 @@ final class PermissionGateTests: XCTestCase {
         XCTAssertTrue(gate.evaluate(.editFile(path: "/tmp/a", replacement: "y")).isAllowed)
         XCTAssertFalse(gate.evaluate(.shell(command: "rm -rf /tmp/example")).isAllowed)
     }
+
+    func testAskModeRequiresApprovalForReadOnlyTools() {
+        let gate = PermissionGate(mode: .ask)
+
+        let evaluation = gate.evaluate(.readFile(path: "/tmp/a"))
+
+        XCTAssertFalse(evaluation.isAllowed)
+        XCTAssertTrue(evaluation.requiresUserApproval)
+        XCTAssertEqual(evaluation.risk, .readOnly)
+    }
 }

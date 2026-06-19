@@ -215,6 +215,15 @@ public struct CommandSandbox: Sendable {
             return CommandValidationResult(isAllowed: false, requiresApproval: false, risk: .unknown, reason: "Empty command")
         }
 
+        if isPermanentlyBlockedDestructiveRM(trimmed) {
+            return CommandValidationResult(
+                isAllowed: false,
+                requiresApproval: false,
+                risk: .destructive,
+                reason: "Command is permanently blocked by sandbox policy: destructive rm against root or home"
+            )
+        }
+
         if let pattern = firstMatch(in: trimmed, patterns: permanentBlocklist) {
             return CommandValidationResult(
                 isAllowed: false,
@@ -261,6 +270,139 @@ public struct CommandSandbox: Sendable {
             risk: .unknown,
             reason: "Unrecognized command requires approval"
         )
+    }
+
+    private func isPermanentlyBlockedDestructiveRM(_ command: String) -> Bool {
+        for segment in shellSegments(from: command) {
+            let tokens = shellTokens(from: segment)
+            for index in tokens.indices {
+                let executable = URL(fileURLWithPath: tokens[index]).lastPathComponent
+                guard executable == "rm" else { continue }
+                let arguments = Array(tokens[tokens.index(after: index)...])
+                if rmArgumentsDeleteRootOrHome(arguments) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private func shellSegments(from command: String) -> [String] {
+        command.split { character in
+            character == ";" || character == "|" || character == "\n"
+        }.map(String.init)
+    }
+
+    private func shellTokens(from segment: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        var quote: Character?
+        var isEscaped = false
+
+        func appendCurrentIfNeeded() {
+            guard !current.isEmpty else { return }
+            tokens.append(current)
+            current.removeAll(keepingCapacity: true)
+        }
+
+        for character in segment {
+            if isEscaped {
+                current.append(character)
+                isEscaped = false
+                continue
+            }
+
+            if character == "\\" {
+                isEscaped = true
+                continue
+            }
+
+            if let quoteCharacter = quote {
+                if character == quoteCharacter {
+                    quote = nil
+                } else {
+                    current.append(character)
+                }
+                continue
+            }
+
+            if character == "\"" || character == "'" {
+                quote = character
+                continue
+            }
+
+            if isShellWhitespace(character) {
+                appendCurrentIfNeeded()
+            } else {
+                current.append(character)
+            }
+        }
+
+        appendCurrentIfNeeded()
+        return tokens
+    }
+
+    private func rmArgumentsDeleteRootOrHome(_ arguments: [String]) -> Bool {
+        var hasRecursive = false
+        var hasForce = false
+        var hasRootOrHomeTarget = false
+        var parsesOptions = true
+
+        for argument in arguments {
+            if parsesOptions && argument == "--" {
+                parsesOptions = false
+                continue
+            }
+
+            if parsesOptions && argument.hasPrefix("--") {
+                if argument == "--recursive" {
+                    hasRecursive = true
+                } else if argument == "--force" {
+                    hasForce = true
+                }
+                continue
+            }
+
+            if parsesOptions && argument.hasPrefix("-") && argument != "-" {
+                let flags = argument.drop { $0 == "-" }
+                if flags.contains("r") || flags.contains("R") {
+                    hasRecursive = true
+                }
+                if flags.contains("f") || flags.contains("F") {
+                    hasForce = true
+                }
+                continue
+            }
+
+            if isRootOrHomeDeletionTarget(argument) {
+                hasRootOrHomeTarget = true
+            }
+        }
+
+        return hasRecursive && hasForce && hasRootOrHomeTarget
+    }
+
+    private func isRootOrHomeDeletionTarget(_ argument: String) -> Bool {
+        let normalized = removingTrailingSlashes(from: argument)
+        if normalized == "/" {
+            return true
+        }
+        if normalized == "~" || normalized == "$HOME" || normalized == "${HOME}" {
+            return true
+        }
+        return normalized == "~/." || normalized == "$HOME/." || normalized == "${HOME}/."
+    }
+
+    private func removingTrailingSlashes(from value: String) -> String {
+        var result = value
+        while result.count > 1 && result.last == "/" {
+            result.removeLast()
+        }
+        return result
+    }
+
+    private func isShellWhitespace(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { CharacterSet.whitespacesAndNewlines.contains($0) }
     }
 
     private func isReadOnlyCommand(_ command: String) -> Bool {
@@ -329,9 +471,6 @@ public struct PermissionGate: Sendable {
 
         switch mode {
         case .ask:
-            if action.isReadOnly {
-                return PermissionDecision(isAllowed: true, reason: "read-only action allowed", risk: .readOnly)
-            }
             return PermissionDecision(
                 isAllowed: false,
                 reason: "approval required",
@@ -607,19 +746,36 @@ public enum TerminalInputSanitizer {
     }
 }
 
+public enum AIOutputSanitizer {
+    public static func sanitize(_ output: String) -> String {
+        TerminalInputSanitizer.sanitize(output)
+    }
+}
+
+public enum ToolApprovalDecision: Sendable, Equatable {
+    case allowOnce
+    case deny(String)
+    case alwaysAllow
+}
+
+public typealias ToolApprovalHandler = @Sendable (PermissionEvaluation) -> ToolApprovalDecision
+
 public final class ToolDispatcher {
     private let permissionGate: PermissionGate
     private let gitReviewService: GitReviewService
     private let auditLogger: AuditLogger?
+    private let approvalHandler: ToolApprovalHandler?
 
     public init(
         permissionGate: PermissionGate,
         gitReviewService: GitReviewService = GitReviewService(),
-        auditLogger: AuditLogger? = nil
+        auditLogger: AuditLogger? = nil,
+        approvalHandler: ToolApprovalHandler? = nil
     ) {
         self.permissionGate = permissionGate
         self.gitReviewService = gitReviewService
         self.auditLogger = auditLogger
+        self.approvalHandler = approvalHandler
     }
 
     public func dispatch(_ action: ToolAction, source: ToolCallSource = .agent) throws -> String {
@@ -632,7 +788,7 @@ public final class ToolDispatcher {
             detail: evaluation.decision.reason
         ))
 
-        guard evaluation.decision.isAllowed else {
+        guard evaluation.decision.isAllowed || approveIfRequested(evaluation) else {
             throw ToolDispatchError.denied(evaluation.decision.reason)
         }
 
@@ -682,6 +838,21 @@ public final class ToolDispatcher {
             throw ToolDispatchError.failed(errorText.isEmpty ? outputText : errorText)
         }
         return outputText
+    }
+
+    private func approveIfRequested(_ evaluation: PermissionEvaluation) -> Bool {
+        guard evaluation.decision.requiresUserApproval, let approvalHandler else {
+            return false
+        }
+
+        switch approvalHandler(evaluation) {
+        case .allowOnce:
+            return true
+        case .alwaysAllow:
+            return evaluation.decision.risk != .destructive && evaluation.decision.risk != .network
+        case .deny:
+            return false
+        }
     }
 
     private func auditAction(for decision: PermissionDecision) -> AuditAction {
