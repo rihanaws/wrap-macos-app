@@ -1,0 +1,3 @@
+import WarpCLICore
+
+WarpCommand.main()

@@ -2,30 +2,42 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_ONLY="${1:-}"
-APP_NAME="WarpClone"
-APP_DIR="$ROOT_DIR/.build/debug/${APP_NAME}.app"
-EXECUTABLE="$ROOT_DIR/.build/debug/${APP_NAME}"
+BUILD_ONLY=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --build-only)
+      BUILD_ONLY=true
+      ;;
+    *)
+      echo "Unknown argument: $arg" >&2
+      exit 64
+      ;;
+  esac
+done
 
 cd "$ROOT_DIR"
 
-swift build
+swift build --product WarpClone
+
+APP_DIR="$ROOT_DIR/.build/debug/WarpClone.app"
+EXECUTABLE="$ROOT_DIR/.build/debug/WarpClone"
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
-cp "$EXECUTABLE" "$APP_DIR/Contents/MacOS/$APP_NAME"
+cp "$EXECUTABLE" "$APP_DIR/Contents/MacOS/WarpClone"
 
-cat > "$APP_DIR/Contents/Info.plist" <<PLIST
+cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key>
-  <string>${APP_NAME}</string>
+  <string>WarpClone</string>
   <key>CFBundleIdentifier</key>
   <string>com.warpclone.app</string>
   <key>CFBundleName</key>
-  <string>${APP_NAME}</string>
+  <string>WarpClone</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -34,25 +46,15 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <string>1</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
-  <key>NSPrincipalClass</key>
-  <string>NSApplication</string>
-  <key>CFBundleURLTypes</key>
-  <array>
-    <dict>
-      <key>CFBundleURLName</key>
-      <string>com.warpclone.auth</string>
-      <key>CFBundleURLSchemes</key>
-      <array>
-        <string>warpclone</string>
-      </array>
-    </dict>
-  </array>
+  <key>NSHighResolutionCapable</key>
+  <true/>
 </dict>
 </plist>
 PLIST
 
-echo "Built $APP_DIR"
-
-if [[ "$BUILD_ONLY" != "--build-only" ]]; then
-  /usr/bin/open -n "$APP_DIR"
+if [ "$BUILD_ONLY" = true ]; then
+  echo "Built $APP_DIR"
+  exit 0
 fi
+
+/usr/bin/open "$APP_DIR"

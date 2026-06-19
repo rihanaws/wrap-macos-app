@@ -1,44 +1,93 @@
-# wrap-macos-app
+# WarpClone
 
-WarpClone is a Mac-native SwiftUI terminal workspace built with SwiftPM. It combines real PTY-backed shell sessions, block-based terminal output, split panes, AI provider tooling, OpenRouter model discovery, MCP management, git diff review, and a premium macOS visual system.
+WarpClone is a Mac-native SwiftUI terminal workspace built with SwiftPM. It includes a sidebar/detail/inspector app shell, real PTY-backed terminal panes, command blocks, themes, AI provider wiring, git review surfaces, MCP management, and a terminal-native `warp` CLI companion.
 
-## Highlights
+## Products
 
-- Native `WindowGroup` app with dedicated `Settings` scene.
-- `NavigationSplitView` with premium vertical session tabs, detail pane, and inspector.
-- Real pseudo-terminal sessions using `posix_openpt`, `fork`, `setsid`, `dup2`, and shell exec.
-- ANSI parser with 16-color, 256-color, true-color, and text attribute support.
-- Premium terminal block cards with status borders, metadata header, hover toolbar, and icon actions.
-- AI toolbelt with model picker, auto-detection, voice, image, context, and file controls.
-- OpenRouter/BYOK provider plumbing with Keychain-backed credentials.
-- Cached OpenRouter model discovery and grouped model selection.
-- 3-tab inspector for AI, Code Review, and MCP.
-- 21 typed themes with block background colors.
+- `WarpClone` — macOS SwiftUI app.
+- `warp` — Claude Code-style terminal CLI companion.
+- `WarpCLICore` — testable CLI core library.
 
-## Build
+## macOS app
+
+The app uses:
+
+- `WindowGroup` for the main window and a dedicated `Settings` scene.
+- `NavigationSplitView` with explicit sidebar selection.
+- Terminal split panes, command blocks, command palette, 3-tab inspector, and Settings.
+- Real PTY lifecycle, ANSI parsing, 21 themes, Keychain-backed BYOK credentials, git review, and MCP views.
+
+Build and run:
 
 ```bash
-swift test
-swift build
+swift build --product WarpClone
 ./script/build_and_run.sh --build-only
 ./script/build_and_run.sh
 ```
 
-The app bundle is generated at:
+The generated app bundle is:
 
 ```bash
 .build/debug/WarpClone.app
 ```
 
+## CLI companion
+
+Build:
+
+```bash
+swift build --product warp
+```
+
+Run locally:
+
+```bash
+swift run warp --help
+swift run warp config --show
+swift run warp config --provider openrouter --model openai/gpt-4o
+swift run warp config --provider openrouter --api-key "$OPENROUTER_API_KEY"
+swift run warp ask "Summarize the current repo"
+swift run warp review --path .
+swift run warp mcp list
+swift run warp chat
+```
+
+Install from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rihanaws/wrap-macos-app/main/install.sh | sh
+```
+
+Install from a local checkout:
+
+```bash
+WARPCLONE_REPO_URL="$(pwd)" WARPCLONE_INSTALL_DIR="$HOME/.local/bin" ./script/install_cli.sh
+```
+
+Release installer artifacts are expected to be named:
+
+- `warp-macos-arm64.tar.gz`
+- `warp-macos-x86_64.tar.gz`
+- `warp-linux-x86_64.tar.gz`
+
+The CLI stores non-secret configuration in `~/.warp/config.json`, session transcripts in `~/.warp/sessions`, and API keys in macOS Keychain.
+
+## Verification
+
+```bash
+swift build --build-tests
+swift build
+swift build --product warp
+./script/build_and_run.sh --build-only
+```
+
+`swift test` is expected to run the XCTest bundle in normal signed local environments. If macOS blocks the generated test bundle with “library load denied by system policy,” use `swift build --build-tests` as the non-executing compile validation and resolve local code-signing policy before running tests.
+
 ## Requirements
 
 - macOS 13+
-- Xcode command line tools
-- Swift 5.9+
-
-## Secrets
-
-API keys are stored in macOS Keychain. Do not commit `.env` files, tokens, or generated build artifacts.
+- Xcode command line tools / Swift 5.9+
+- User-provided AI provider credentials for network AI calls
 
 ## License
 
