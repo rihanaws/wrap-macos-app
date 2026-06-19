@@ -4,23 +4,21 @@
 
 ### Added
 
-- Added the `warp` SwiftPM executable product as a Claude Code-style terminal companion.
-- Added `WarpCLICore` with command routing, config/session persistence, Keychain-backed provider credentials, provider request builders, SSE response normalization, git review helpers, MCP config discovery, terminal ANSI primitives, block rendering, raw-mode support, permission gating, and tool dispatch.
-- Added CLI tests covering command registry, config persistence, session persistence, provider request shape, git status parsing, MCP config parsing, terminal primitives, block rendering, and permission policy.
-- Added root `install.sh` for release-artifact `curl | sh` installation and `script/install_cli.sh` for source-checkout installation.
+- Added the `warp` CLI companion executable with `ask`, `chat`, `agent`, `review`, `mcp`, and `config` commands.
+- Added `WarpCLICore` for CLI configuration, Keychain-backed provider credentials, OpenRouter-compatible streaming, git review prompts, MCP discovery, terminal primitives, and permission gating.
+- Added source and release installer scripts for the CLI.
+- Added shared security guardrails: tool risk classification, command sandbox validation, JSONL audit logging, MCP sandbox homes, MCP rate limiting, and terminal input sanitization.
 
 ### Changed
 
-- Updated `script/build_and_run.sh` to build the `WarpClone` app product explicitly before creating the app bundle.
-- Updated README with app and CLI build, run, install, and verification instructions.
+- Updated the SwiftPM package to build the macOS app and CLI as separate executable products.
+- Updated the app product to depend on `WarpCLICore` so the app and CLI use shared security primitives.
+- Updated README instructions for building, running, installing, and validating the app and CLI.
+- Hardened MCP startup in the macOS app by filtering inherited secrets, assigning a restricted per-server `HOME`, and auditing discover/start/stop/remove events.
+- Sanitized text before writing to the PTY so OSC/DCS manipulation sequences do not reach the terminal process.
 
 ## 0.1.0 — 2026-06-19
 
 ### Added
 
-- Initial Mac-native SwiftUI app shell with sidebar, detail pane, inspector, Settings scene, command menus, command palette, split panes, and terminal UI.
-- Real PTY lifecycle using `posix_openpt`, `grantpt`, `unlockpt`, `fork`, `setsid`, `dup2`, shell exec, async read loop, resize propagation, and cleanup.
-- ANSI parser coverage for 16-color, 256-color, true color, reset, and nested styles.
-- 21-theme registry with terminal/detail styling and native sidebar/window materials.
-- OpenRouter/BYOK provider wiring, model discovery cache, Keychain credential storage, git review surface, MCP inspector, image attachments, and premium visual redesign.
-- MIT license and first GitHub push.
+- Initial SwiftPM macOS app shell with `WindowGroup`, dedicated `Settings` scene, `NavigationSplitView`, inspector, command menus, command palette, split panes, PTY-backed terminal sessions, ANSI parsing, 21 themes, OpenRouter/BYOK settings, MCP inspector, git review surfaces, MIT license, README, and build/run script.

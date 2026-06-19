@@ -1,5 +1,4 @@
 // swift-tools-version: 5.9
-
 import PackageDescription
 
 let package = Package(
@@ -17,7 +16,17 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "WarpClone"
+            name: "WarpClone",
+            dependencies: [
+                "WarpCLICore"
+            ]
+        ),
+        .executableTarget(
+            name: "WarpCLI",
+            dependencies: [
+                "WarpCLICore",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ]
         ),
         .target(
             name: "WarpCLICore",
@@ -25,23 +34,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]
         ),
-        .executableTarget(
-            name: "WarpCLI",
-            dependencies: [
-                "WarpCLICore"
-            ]
-        ),
-        .testTarget(
-            name: "WarpCloneTests",
-            dependencies: [
-                "WarpClone"
-            ]
-        ),
         .testTarget(
             name: "WarpCLITests",
             dependencies: [
-                "WarpCLICore",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                "WarpCLICore"
             ]
         )
     ]

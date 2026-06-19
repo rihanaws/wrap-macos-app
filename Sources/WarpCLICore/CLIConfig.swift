@@ -29,7 +29,7 @@ public enum CLIProvider: String, Codable, CaseIterable, ExpressibleByArgument {
     }
 }
 
-public enum PermissionMode: String, Codable, CaseIterable, ExpressibleByArgument {
+public enum PermissionMode: String, Codable, CaseIterable, ExpressibleByArgument, Sendable {
     case ask
     case allowRead = "allow-read"
     case allowWrite = "allow-write"

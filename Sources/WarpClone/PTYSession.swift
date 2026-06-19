@@ -1,4 +1,5 @@
 import Foundation
+import WarpCLICore
 import Darwin
 
 @_silgen_name("fork")
@@ -72,7 +73,8 @@ final class PTYSession {
 
     func write(_ text: String) {
         guard masterFD >= 0 else { return }
-        let bytes = Array(text.utf8)
+        let sanitizedText = TerminalInputSanitizer.sanitize(text)
+        let bytes = Array(sanitizedText.utf8)
         bytes.withUnsafeBufferPointer { pointer in
             guard let baseAddress = pointer.baseAddress else { return }
             _ = Darwin.write(masterFD, baseAddress, pointer.count)

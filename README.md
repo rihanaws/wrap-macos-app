@@ -72,6 +72,16 @@ Release installer artifacts are expected to be named:
 
 The CLI stores non-secret configuration in `~/.warp/config.json`, session transcripts in `~/.warp/sessions`, and API keys in macOS Keychain.
 
+## Security guardrails
+
+WarpClone includes shared app/CLI guardrails for AI and MCP tool execution:
+
+- Permission tiers and tool risk classification for read-only, write, destructive, network, credential, and unknown actions.
+- Command sandbox validation that permanently blocks unsafe installer pipes such as `curl ... | sh` and requires approval for destructive shell patterns.
+- Append-only JSONL audit logging at `~/.warp/audit.log` with `0600` permissions.
+- MCP startup isolation with filtered secret-bearing environment variables and per-server homes under `~/.warp/mcp-sandbox/<server-id>/`.
+- Terminal input sanitization that strips OSC/DCS control sequences while preserving normal ANSI color/style output.
+
 ## Verification
 
 ```bash
