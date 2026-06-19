@@ -1,0 +1,3 @@
+.build/
+.playwright-mcp/
+.DS_Store
