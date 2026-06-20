@@ -33,9 +33,9 @@ struct PermissionApprovalView: View {
     /// high-impact actions require an explicit click or keyboard navigation to the button.
     private var requiresExplicitConfirmation: Bool {
         switch risk {
-        case .destructive, .network, .credential:
+        case .destructive, .network, .credential, .unknown:
             return true
-        case .readOnly, .write, .unknown:
+        case .readOnly, .write:
             return false
         }
     }
@@ -86,9 +86,15 @@ struct PermissionApprovalView: View {
 
             if let command, !command.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Command")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text("Command")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("Scroll to review full command")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                     ScrollView([.vertical, .horizontal]) {
                         Text(command)
                             .font(.system(size: 12, design: .monospaced))
@@ -109,11 +115,8 @@ struct PermissionApprovalView: View {
 
                 Spacer()
 
-                if command != nil {
-                    Button("Edit Command") {
-                        onEditCommand?()
-                    }
-                    .disabled(onEditCommand == nil)
+                if command != nil, let onEditCommand {
+                    Button("Edit Command", action: onEditCommand)
                 }
 
                 if requiresExplicitConfirmation {
