@@ -61,7 +61,7 @@ WarpClone is a dual-product Swift project: a native macOS terminal app + CLI com
 
 **MCP Sandbox + Approval**: Each MCP server gets a restricted per-server `HOME` with inherited secrets filtered at startup. Discovered servers also require explicit SHA256 descriptor-hash approval (`MCPManager.approve`/`approvedDescriptorHashes`) before `Process.run()` — Inspector's Start button routes unapproved servers through `PermissionApprovalView` instead of starting directly. MCPRegistry parses both claude_settings.json and .cursorrules/settings.toml for auto-discovery.
 
-**Permission Approval UI**: `PermissionApprovalView` (Sources/WarpClone) is the reusable SwiftUI sheet for any approval flow — Allow Once / Deny / Edit Command (when a command exists) / Always Allow (only for non-destructive, non-network risk). Used by MCP approval today; designed for future ToolDispatcher approval callbacks via `ToolApprovalHandler`.
+**Permission Approval UI**: `PermissionApprovalView` (Sources/WarpClone) is the reusable SwiftUI sheet for any approval flow — Allow Once / Deny / Edit Command (when a command exists) / Always Allow (only for `.readOnly`/`.write` risk — gated off for `.destructive`/`.network`/`.credential`/`.unknown`). Risk is conveyed via icon, color, visible text badge, and a combined VoiceOver label (not color/icon alone). `.destructive`/`.network`/`.credential` also drop the default-Return-key shortcut on Allow Once, requiring explicit confirmation. Used by MCP approval today; designed for future ToolDispatcher approval callbacks via `ToolApprovalHandler`.
 
 **Terminal Hardening**: PTYSession uses a single `DispatchSourceRead` per session (spawn guards against double-start, terminate cancels deterministically — no concurrent readers). Input is sanitized of OSC/DCS sequences before reaching the terminal process.
 
@@ -117,6 +117,12 @@ Project-specific subagents in `.claude/agents/`:
 - `codereviewer` — security/correctness diff review, flags PermissionGate/MCP/PTY/sanitizer regressions.
 - `swift-uidesignreviewer` — SwiftUI layout, accessibility, macOS HIG, approval-UI clarity review.
 - `codebase-doc-writer` — generates/refreshes architecture docs, verifies claims against source before writing.
+
+**Note**: custom agents in `.claude/agents/` may not be registered in an already-running session (observed: `swift-uidesignreviewer` absent from `Agent` tool's available list mid-session despite the file existing). If a custom agent name fails with "not found," do not silently skip the review — either start a new session to re-register agents, or fall back to a manual review against that agent's spec file and say so explicitly in the response.
+
+## Session Start
+
+At the start of a new session (or after `/clear`), run the `mem-search` skill (or claude-mem's cross-session search) before reading project files, to recall prior decisions/rationale from past sessions on this repo. Use memory only for *why* something was done — always verify current code/config state directly rather than trusting memory for *what currently exists*, since memory can go stale.
 
 ## Dependencies
 
