@@ -47,6 +47,7 @@ script/install.sh                        # install CLI to $HOME/.local/bin
 - **Code review surface**: `InspectorView` Code Review tab is a two-column file list + diff viewer backed by `GitService`. `DiffView` parses raw git diff text into file headers, hunk headers, line-numbered context/add/delete rows, and stub hunk actions. `TerminalDetailView` shows a git diff chip above the input when `GitService.hasUncommittedChanges` is true; tapping it opens the inspector on Code Review.
 - **Review feedback loop**: Code Review comments stream through the selected AI provider into a terminal block and update `git.selectedDiff` when the response looks like a unified diff.
 - **Session tab ordering**: `SidebarView` supports native session reordering via `SessionStore.moveSession(from:to:)`; `VerticalTabRow` keeps the drag handle hover-only.
+- **Input autocomplete**: `InputEditorView` uses an AppKit-backed `CompletionTextField` for macOS 13-safe keyboard handling. `CompletionStore` owns common command, git subcommand, filesystem path, and persisted command-history suggestions. `CompletionDropdownView` renders the picker.
 
 ## Common Tasks
 
@@ -54,6 +55,7 @@ script/install.sh                        # install CLI to $HOME/.local/bin
 - **Add terminal feature**: extend `Screen`/`BlockRenderer` in `TerminalPrimitives.swift`; update `PTYSession` lifecycle if needed.
 - **Add AI conversation behavior**: update `ConversationStore.swift`, `AIInspectorView.swift`, and the AI branch of `TerminalDetailView.submitInput()` together so terminal blocks and chat history stay in sync.
 - **Add code review UI behavior**: update `GitService.swift`, `InspectorView.swift`, and `DiffView.swift` together; keep `GitReviewService.swift` focused on CLI prompt generation.
+- **Add input completion behavior**: update `CompletionStore.swift`, `CompletionDropdownView.swift`, and `InputEditorView.swift` together. Preserve Enter submit, Tab completion, Escape dismissal, Up/Down selection, model picker, image controls, and AI-mode behavior.
 - **Add MCP discovery format**: extend `MCPRegistryParser`; new servers still go through descriptor-hash approval.
 - **Harden a permission rule**: edit `PermissionGate.evaluateCommand()` / `CommandSandbox` — add a test in `SecurityGuardrailTests` proving both the allow and deny side.
 

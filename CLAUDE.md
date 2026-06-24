@@ -81,6 +81,8 @@ WarpClone is a dual-product Swift project: a native macOS terminal app + CLI com
 
 **Code Review Diff Surface**: InspectorView's Code Review tab is a two-column review surface backed by GitService. The sidebar lists changed files, loads per-file diffs, and exposes refresh/stage/discard/open actions. DiffView renders raw git diff text with file headers, hunk headers, line numbers, green additions, red deletions, and stub hunk action buttons. TerminalDetailView shows a git diff chip above the input when GitService has uncommitted changes; tapping it opens the inspector on the Code Review tab.
 
+**Input Autocomplete**: InputEditorView uses an AppKit-backed CompletionTextField for macOS 13-safe key handling. CompletionStore owns common command, git subcommand, filesystem path, and persisted command-history suggestions. CompletionDropdownView renders the picker. Preserve Enter submit, Tab completion, Escape dismissal, Up/Down selection, model picker, image controls, and AI-mode behavior.
+
 ### Testing
 
 Tests are in `Tests/WarpCLITests` (core) and `Tests/WarpCloneTests` (UI). Focus areas:
@@ -101,6 +103,9 @@ Tests are in `Tests/WarpCLITests` (core) and `Tests/WarpCloneTests` (UI). Focus 
 | PTYSession.swift | PTY lifecycle, session restore, sequence sanitization |
 | TerminalPrimitives.swift | ANSI codes, terminal sizing, raw mode |
 | TerminalDetailView.swift | Terminal panes, input editor, AI streaming submission, git diff chip |
+| CompletionStore.swift | Command/git/path/history suggestion state |
+| CompletionDropdownView.swift | Autocomplete popup UI |
+| InputEditorView.swift | Completion-aware terminal input and toolbelt |
 | GitService.swift | Git branch/status/diff loading and diff summary state |
 | InspectorView.swift | AI/MCP/Code Review inspector shell and git diff review surface |
 | DiffView.swift | Raw git diff renderer with line numbers, hunk headers, and colored changes |

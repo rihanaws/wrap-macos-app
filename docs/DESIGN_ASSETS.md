@@ -32,6 +32,7 @@ Capture the main app window with:
 Recommended screenshot set:
 
 - Main terminal with command blocks.
+- Autocomplete dropdown under the input editor with command, git, path, and history suggestions.
 - AI Inspector streaming a response.
 - Code Review diff with file sidebar and hunk actions.
 - Settings/Security panel showing provider and permission controls.

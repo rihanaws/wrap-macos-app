@@ -1,6 +1,8 @@
 # WarpClone
 
-WarpClone is a Mac-native SwiftUI terminal workspace with command blocks, AI streaming, code review diffs, MCP inspection, and explicit security guardrails.
+WarpClone is a Mac-native SwiftUI terminal workspace with command blocks, input autocomplete, AI streaming, code review diffs, MCP inspection, and explicit security guardrails.
+
+The terminal input suggests common commands, git subcommands, filesystem paths from the active session directory, and recent command history. Use Up/Down to move through suggestions, Tab to accept, Escape to dismiss, and Enter to submit.
 
 ## Beta Release
 
@@ -47,7 +49,7 @@ GITHUB_OAUTH_CLIENT_ID="your-client-id" ./script/build_and_sign.sh
 
 Then select `GitHub Copilot` in Settings and use the device-code sign-in flow. Tokens are stored in macOS Keychain under the WarpClone Copilot service.
 
-WarpClone is a Mac-native SwiftUI terminal workspace built with SwiftPM. It includes a sidebar/detail/inspector app shell, real PTY-backed terminal panes, command blocks, themes, AI provider wiring, git review surfaces, MCP management, and a terminal-native `warp` CLI companion.
+WarpClone is a Mac-native SwiftUI terminal workspace built with SwiftPM. It includes a sidebar/detail/inspector app shell, real PTY-backed terminal panes, command blocks, input autocomplete, themes, AI provider wiring, git review surfaces, MCP management, and a terminal-native `warp` CLI companion.
 
 ## Products
 

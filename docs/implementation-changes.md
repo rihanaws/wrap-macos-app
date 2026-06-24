@@ -147,3 +147,19 @@ Verification for this pass:
 swift build
 swift test
 ```
+
+## Input Autocomplete
+
+Added terminal input autocomplete for common commands, git subcommands, filesystem paths, and persisted command history.
+
+Files changed:
+
+- `Sources/WarpClone/CompletionStore.swift`
+- `Sources/WarpClone/CompletionDropdownView.swift`
+- `Sources/WarpClone/InputEditorView.swift`
+
+Implementation notes:
+
+- `CompletionStore` owns suggestion state, sorting, history persistence, path lookup from the active session working directory, and completion application.
+- `CompletionDropdownView` renders command, git, path, and history suggestions with keyboard-selected state.
+- `InputEditorView` uses an AppKit-backed `CompletionTextField` so Tab, Escape, Up/Down, and Enter work on macOS 13 while preserving the model picker, image controls, AI-mode toggle, and submit behavior.

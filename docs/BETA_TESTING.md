@@ -18,6 +18,7 @@ swift build
 ## Test Checklist
 
 - Run terminal commands: `ls`, `git status`, `cat`, `grep`.
+- Verify autocomplete in the terminal input: command suggestions (`git`), git subcommands (`git sta`), paths (`./` or `/usr/`), and recent history after submitting a command. Confirm Up/Down changes selection, Tab accepts, Escape dismisses, and Enter still submits.
 - Try interactive programs such as `vim`, `nano`, and `htop`.
 - Split panes with `Cmd+D` and `Cmd+Shift+D`.
 - Switch working directories and confirm new commands run in the active directory.

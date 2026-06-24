@@ -2,6 +2,8 @@
 
 ## 1.0.0-beta - 2026-06-24
 
+- Added terminal input autocomplete for common commands, git subcommands, filesystem paths, and persisted command history.
+
 ### Added
 
 - GitHub Copilot OAuth device-flow scaffolding, Keychain-backed Copilot token storage, Copilot model registration, and Settings sign-in UI.
