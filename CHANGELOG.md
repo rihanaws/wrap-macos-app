@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0-beta - 2026-06-24
+
+### Added
+
+- GitHub Copilot OAuth device-flow scaffolding, Keychain-backed Copilot token storage, Copilot model registration, and Settings sign-in UI.
+- Release preparation scripts for app bundling, ad-hoc or Developer ID signing, optional notarization, DMG creation, beta invites, screenshots, and icon generation.
+- SwiftPM app resources for bundle metadata, signing entitlements, and macOS icon assets.
+- Beta testing guide, privacy policy, and design asset documentation.
+- AI streaming into terminal blocks and the AI Inspector conversation panel.
+- Code Review diff surface with file sidebar, colored additions/deletions, line numbers, and hunk action stubs.
+- Sidebar session drag reordering and terminal block entrance animation.
+
+### Notes
+
+- Public distribution still requires a valid Apple Developer ID certificate and notarization credentials.
+- Hunk-level apply/revert actions are wired as UI stubs only.
+
 ## 0.2.0 — 2026-06-20
 
 ### Added

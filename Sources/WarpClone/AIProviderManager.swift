@@ -27,7 +27,8 @@ final class AIProviderManager: ObservableObject {
             .openAICompatible: OpenAICompatibleClient(),
             .anthropic: AnthropicClient(),
             .googleGemini: GeminiClient(),
-            .openRouter: OpenRouterClient()
+            .openRouter: OpenRouterClient(),
+            .copilot: CopilotAPIClient()
         ]
     }
 
@@ -42,6 +43,13 @@ final class AIProviderManager: ObservableObject {
             }
         }
         do {
+            if kind == .copilot {
+                let loaded = try await clients[kind]?.availableModels(apiKey: "") ?? []
+                self.selectedKind = kind
+                self.models = loaded
+                return
+            }
+
             guard let key = try keychain.read(service: serviceName(kind), account: "apiKey") else {
                 await MainActor.run { self.lastError = "Missing API key for \(kind.rawValue)." }
                 return
@@ -58,6 +66,13 @@ final class AIProviderManager: ObservableObject {
     }
 
     func complete(kind: AIProviderKind, request: AIRequest) async throws -> AsyncThrowingStream<AIResponseChunk, Error> {
+        if kind == .copilot {
+            guard let client = clients[kind] else {
+                throw ProviderError.unsupported(kind.rawValue)
+            }
+            return try await client.complete(request: request, apiKey: "")
+        }
+
         guard let key = try keychain.read(service: serviceName(kind), account: "apiKey") else {
             throw ProviderError.missingAPIKey(kind.rawValue)
         }

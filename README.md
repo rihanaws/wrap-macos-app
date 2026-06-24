@@ -1,5 +1,52 @@
 # WarpClone
 
+WarpClone is a Mac-native SwiftUI terminal workspace with command blocks, AI streaming, code review diffs, MCP inspection, and explicit security guardrails.
+
+## Beta Release
+
+Build a local release DMG with an ad-hoc signature:
+
+```bash
+./script/build_and_sign.sh
+```
+
+Build with a Developer ID certificate:
+
+```bash
+SIGNING_ID="Developer ID Application: Your Name (TEAMID)" ./script/build_and_sign.sh
+```
+
+Enable notarization after storing a notarytool keychain profile:
+
+```bash
+./script/notarize_setup.sh
+APPLE_ID="you@example.com" APPLE_TEAM_ID="TEAMID" NOTARIZE=true ./script/build_and_sign.sh
+```
+
+Beta testing and release asset docs:
+
+- [Beta testing guide](docs/BETA_TESTING.md)
+- [Design assets](docs/DESIGN_ASSETS.md)
+- [Privacy policy](PRIVACY_POLICY.md)
+
+Generate icons and screenshots:
+
+```bash
+./script/generate_icons.sh path/to/icon_1024.png
+./script/screenshot.sh
+```
+
+## GitHub Copilot OAuth
+
+WarpClone can use GitHub Copilot as an AI provider through GitHub OAuth device flow. Configure a GitHub OAuth App client ID with one of these options:
+
+```bash
+WARPCLONE_GITHUB_CLIENT_ID="your-client-id" ./script/build_and_run.sh
+GITHUB_OAUTH_CLIENT_ID="your-client-id" ./script/build_and_sign.sh
+```
+
+Then select `GitHub Copilot` in Settings and use the device-code sign-in flow. Tokens are stored in macOS Keychain under the WarpClone Copilot service.
+
 WarpClone is a Mac-native SwiftUI terminal workspace built with SwiftPM. It includes a sidebar/detail/inspector app shell, real PTY-backed terminal panes, command blocks, themes, AI provider wiring, git review surfaces, MCP management, and a terminal-native `warp` CLI companion.
 
 ## Products

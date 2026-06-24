@@ -6,6 +6,8 @@ struct TerminalDetailView: View {
     @EnvironmentObject private var runtime: TerminalRuntimeStore
     @EnvironmentObject private var ai: AIProviderManager
     @EnvironmentObject private var images: ImageAttachmentManager
+    @EnvironmentObject private var conversation: ConversationStore
+    @EnvironmentObject private var git: GitService
 
     @Binding var showInspector: Bool
     @State private var input = ""
@@ -31,8 +33,12 @@ struct TerminalDetailView: View {
                 }
             }
             .padding(16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(hex: ThemeRegistry.theme(id: preferences.theme).background))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(hex: ThemeRegistry.theme(id: preferences.theme).background))
+
+            if git.hasUncommittedChanges {
+                gitDiffChip
+            }
 
             Divider()
 
@@ -55,18 +61,105 @@ struct TerminalDetailView: View {
             .environmentObject(images)
         }
         .background(Color(hex: ThemeRegistry.theme(id: preferences.theme).background).opacity(preferences.windowOpacity))
+        .onAppear {
+            git.refresh(repositoryPath: currentDirectory)
+        }
+    }
+
+    private var gitDiffChip: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .foregroundStyle(.secondary)
+            Text("\(git.changedFiles.count) files")
+                .font(.system(size: 11, weight: .medium))
+            HStack(spacing: 2) {
+                Text("+\(git.totalAdditions)")
+                    .foregroundStyle(.green)
+                Text("-\(git.totalDeletions)")
+                    .foregroundStyle(.red)
+            }
+            .font(.system(size: 11, weight: .medium))
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.secondary.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.separator, lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showInspector = true
+            NotificationCenter.default.post(name: .showWarpCloneCodeReview, object: nil)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 4)
+    }
+
+    private var currentDirectory: String {
+        sessions.selectedSession?.workingDirectory ?? FileManager.default.currentDirectoryPath
     }
 
     private func submitInput() {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        if sessions.isAIMode {
-            sessions.appendBlock(command: "# \(trimmed)", output: "AI request queued for \(preferences.selectedAIModel).", status: .succeeded)
-        } else {
+        let isHashPrompt = trimmed == "#" || trimmed.hasPrefix("# ")
+        if !sessions.isAIMode && !isHashPrompt {
             runtime.send(trimmed, to: sessions.activePaneID)
             sessions.appendBlock(command: trimmed, output: "", status: .running)
+            input = ""
+            return
         }
+
+        let provider = AIProviderKind(rawValue: preferences.aiProviderMode) ?? .openRouter
+        let userPrompt = isHashPrompt ? trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines) : trimmed
+        guard !userPrompt.isEmpty else { return }
+        let requestImages = images.attachments
+        _ = conversation.addUserMessage(userPrompt)
+        let assistantMessageID = conversation.addAssistantMessage(model: preferences.selectedAIModel)
+        let blockID = sessions.appendBlock(command: "# \(userPrompt)", output: "", status: .running)
         input = ""
+        images.clear()
+
+        let task = Task { @MainActor in
+            do {
+                let request = AIRequest(
+                    prompt: userPrompt,
+                    model: preferences.selectedAIModel,
+                    images: requestImages
+                )
+                let stream = try await ai.complete(kind: provider, request: request)
+                for try await chunk in stream {
+                    try Task.checkCancellation()
+                    conversation.appendToMessage(id: assistantMessageID, text: chunk.text)
+                    if let blockID {
+                        sessions.updateBlock(id: blockID, output: conversation.content(for: assistantMessageID))
+                    }
+                    if chunk.isFinal {
+                        break
+                    }
+                }
+                conversation.finishStreaming(id: assistantMessageID)
+                if let blockID {
+                    sessions.updateBlock(id: blockID, output: conversation.content(for: assistantMessageID), status: .succeeded)
+                }
+            } catch is CancellationError {
+                conversation.finishStreaming(id: assistantMessageID)
+                if let blockID {
+                    sessions.updateBlock(id: blockID, output: conversation.content(for: assistantMessageID), status: .succeeded)
+                }
+            } catch {
+                conversation.setError(id: assistantMessageID, error: error.localizedDescription)
+                if let blockID {
+                    sessions.updateBlock(id: blockID, output: error.localizedDescription, status: .failed)
+                }
+            }
+        }
+        conversation.setActiveTask(task)
     }
 }
 

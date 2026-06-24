@@ -19,6 +19,13 @@ let package = Package(
             name: "WarpClone",
             dependencies: [
                 "WarpCLICore"
+            ],
+            exclude: [
+                "Resources/Info.plist",
+                "Resources/Entitlements.plist"
+            ],
+            resources: [
+                .copy("Resources/Assets.xcassets")
             ]
         ),
         .executableTarget(

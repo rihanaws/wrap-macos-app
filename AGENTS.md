@@ -2,6 +2,16 @@
 
 Guidance for Codex (and other agentic CLIs) working in this repo. Mirrors `CLAUDE.md`; keep both in sync if architecture changes.
 
+## Release Prep
+
+- `script/build_and_sign.sh` builds a release `.app`, signs it ad-hoc by default or with `SIGNING_ID`, optionally notarizes with `NOTARIZE=true`, and emits a DMG.
+- `script/notarize_setup.sh` stores Apple notarization credentials in a local keychain profile. Never commit Apple IDs, app-specific passwords, team IDs tied to private accounts, or signing identities as secrets.
+- `script/generate_icons.sh` creates macOS icon assets from a 1024x1024 PNG under `Sources/WarpClone/Resources/Assets.xcassets`.
+- `script/screenshot.sh` captures release screenshots into `docs/screenshots`.
+- Release docs live in `docs/BETA_TESTING.md`, `docs/DESIGN_ASSETS.md`, `PRIVACY_POLICY.md`, and `CHANGELOG.md`.
+- App bundle resources live under `Sources/WarpClone/Resources`; keep `Package.swift` resource registration in sync when adding app metadata or assets.
+- GitHub Copilot OAuth uses device flow. Configure the public OAuth client ID through `GitHubOAuthClientID` in the app bundle, `GITHUB_OAUTH_CLIENT_ID` during release bundling, or `WARPCLONE_GITHUB_CLIENT_ID` for local runs. Tokens live in Keychain via `CopilotTokenStore`; do not store Copilot OAuth tokens as provider API keys.
+
 ## Build & Test
 
 ```bash
@@ -16,7 +26,7 @@ script/install.sh                        # install CLI to $HOME/.local/bin
 
 ## Project Structure
 
-- `Sources/WarpClone` — SwiftUI macOS terminal app (PTY, ANSI render, themes, MCP inspector, git review UI, AI inspector).
+- `Sources/WarpClone` — SwiftUI macOS terminal app (PTY, ANSI render, themes, MCP inspector, git diff review UI, AI conversation inspector).
 - `Sources/WarpCLI` — CLI companion (`ask`/`chat`/`agent`/`review`/`mcp`/`config` subcommands).
 - `Sources/WarpCLICore` — shared library: `PermissionGate.swift` (risk classification, command sandbox, audit log), `MCPRegistry.swift`, `AIProviders.swift`, `GitReviewService.swift`, `TerminalPrimitives.swift`, `CLISessionStore.swift`/`CLIConfig.swift`/`CLIKeychainStore.swift`.
 - `Tests/WarpCLITests`, `Tests/WarpCloneTests` — core and UI tests.
@@ -31,10 +41,19 @@ script/install.sh                        # install CLI to $HOME/.local/bin
 6. **AI-generated text is sanitized before storage/display** via `AIOutputSanitizer` (wraps `TerminalInputSanitizer`). Any new code path that stores or renders AI output must call it — OSC clipboard/window-title/DCS sequences must never reach the terminal or persisted block state unsanitized.
 7. **No secrets in MCP child environments.** Each server gets a restricted `HOME`; token/secret/api-key env vars are stripped at launch, not inherited.
 
+## Current UI Integration Notes
+
+- **AI streaming path**: `TerminalDetailView.submitInput()` routes AI-mode input and literal `# prompt` input through `AIProviderManager.complete()`. Streamed chunks update both the running terminal block (`SessionStore.updateBlock`) and the shared `ConversationStore`. `AIInspectorView` is the persistent chat panel with user/assistant messages, streaming state, errors, image thumbnails, and fenced-code rendering.
+- **Code review surface**: `InspectorView` Code Review tab is a two-column file list + diff viewer backed by `GitService`. `DiffView` parses raw git diff text into file headers, hunk headers, line-numbered context/add/delete rows, and stub hunk actions. `TerminalDetailView` shows a git diff chip above the input when `GitService.hasUncommittedChanges` is true; tapping it opens the inspector on Code Review.
+- **Review feedback loop**: Code Review comments stream through the selected AI provider into a terminal block and update `git.selectedDiff` when the response looks like a unified diff.
+- **Session tab ordering**: `SidebarView` supports native session reordering via `SessionStore.moveSession(from:to:)`; `VerticalTabRow` keeps the drag handle hover-only.
+
 ## Common Tasks
 
 - **Add AI provider**: extend `AIProviderClient` protocol in `AIProviders.swift`, register in `AIProviderManager.clients`.
 - **Add terminal feature**: extend `Screen`/`BlockRenderer` in `TerminalPrimitives.swift`; update `PTYSession` lifecycle if needed.
+- **Add AI conversation behavior**: update `ConversationStore.swift`, `AIInspectorView.swift`, and the AI branch of `TerminalDetailView.submitInput()` together so terminal blocks and chat history stay in sync.
+- **Add code review UI behavior**: update `GitService.swift`, `InspectorView.swift`, and `DiffView.swift` together; keep `GitReviewService.swift` focused on CLI prompt generation.
 - **Add MCP discovery format**: extend `MCPRegistryParser`; new servers still go through descriptor-hash approval.
 - **Harden a permission rule**: edit `PermissionGate.evaluateCommand()` / `CommandSandbox` — add a test in `SecurityGuardrailTests` proving both the allow and deny side.
 

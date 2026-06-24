@@ -52,6 +52,11 @@ final class ImageAttachmentManager: ObservableObject {
         attachments.removeAll { $0.id == id }
     }
 
+    func clear() {
+        attachments.removeAll()
+        lastError = nil
+    }
+
     private func makeAttachment(url: URL, visionSupported: Bool) throws -> ImageAttachment {
         guard let image = NSImage(contentsOf: url) else {
             throw NSError(domain: "WarpClone.ImageAttachment", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported image \(url.lastPathComponent)."])

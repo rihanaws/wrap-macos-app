@@ -23,6 +23,7 @@ struct WarpCloneApp: App {
     @StateObject private var git = GitService()
     @StateObject private var mcp = MCPManager()
     @StateObject private var images = ImageAttachmentManager()
+    @StateObject private var conversation = ConversationStore()
 
     var body: some Scene {
         WindowGroup("WarpClone") {
@@ -34,6 +35,7 @@ struct WarpCloneApp: App {
                 .environmentObject(git)
                 .environmentObject(mcp)
                 .environmentObject(images)
+                .environmentObject(conversation)
                 .frame(minWidth: 1000, minHeight: 700)
         }
         .defaultSize(width: 1000, height: 700)
@@ -130,4 +132,5 @@ struct WarpCloneCommands: Commands {
 extension Notification.Name {
     static let toggleWarpCloneInspector = Notification.Name("toggleWarpCloneInspector")
     static let toggleWarpCloneSidebar = Notification.Name("toggleWarpCloneSidebar")
+    static let showWarpCloneCodeReview = Notification.Name("showWarpCloneCodeReview")
 }

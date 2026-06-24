@@ -5,8 +5,30 @@ final class GitService: ObservableObject {
     @Published var currentBranch: String = "unknown"
     @Published var selectedDiff: String = ""
     @Published var lastError: String?
+    @Published var isLoading: Bool = false
+
+    var hasUncommittedChanges: Bool {
+        !changedFiles.isEmpty
+    }
+
+    var totalAdditions: Int {
+        selectedDiff
+            .split(separator: "\n")
+            .filter { $0.hasPrefix("+") && !$0.hasPrefix("+++") }
+            .count
+    }
+
+    var totalDeletions: Int {
+        selectedDiff
+            .split(separator: "\n")
+            .filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }
+            .count
+    }
 
     func refresh(repositoryPath: String) {
+        isLoading = true
+        defer { isLoading = false }
+
         do {
             currentBranch = try runGit(["rev-parse", "--abbrev-ref", "HEAD"], cwd: repositoryPath)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -18,6 +40,9 @@ final class GitService: ObservableObject {
     }
 
     func loadDiff(repositoryPath: String, filePath: String, staged: Bool = false) {
+        isLoading = true
+        defer { isLoading = false }
+
         do {
             var arguments = ["diff"]
             if staged { arguments.append("--staged") }

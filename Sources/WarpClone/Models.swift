@@ -125,6 +125,7 @@ enum AIProviderKind: String, CaseIterable, Identifiable, Codable {
     case anthropic = "Anthropic"
     case googleGemini = "Google Gemini"
     case openRouter = "OpenRouter"
+    case copilot = "GitHub Copilot"
 
     var id: String { rawValue }
 

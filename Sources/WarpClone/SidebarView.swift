@@ -9,6 +9,9 @@ struct SidebarView: View {
                 ForEach(sessions.sessions) { session in
                     VerticalTabRow(session: session, isSelected: sessions.selectedSessionID == session.id)
                         .tag(Optional(session.id))
+                        .onDrag {
+                            NSItemProvider(object: session.id.uuidString as NSString)
+                        }
                         .contextMenu {
                             Button("Rename") {}
                             Button("Duplicate") {}
@@ -24,6 +27,9 @@ struct SidebarView: View {
                         }
                         .listRowInsets(EdgeInsets(top: 3, leading: 8, bottom: 3, trailing: 8))
                         .listRowBackground(Color.clear)
+                }
+                .onMove { source, destination in
+                    sessions.moveSession(from: source, to: destination)
                 }
             }
         }

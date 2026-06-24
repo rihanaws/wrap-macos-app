@@ -4,6 +4,7 @@ struct TerminalBlockView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     var block: TerminalBlock
     @State private var hovering = false
+    @State private var appeared = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,6 +34,13 @@ struct TerminalBlockView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .onHover { hovering = $0 }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 8)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.3).delay(0.05)) {
+                appeared = true
+            }
+        }
         .animation(.easeOut(duration: 0.2), value: block.id)
     }
 

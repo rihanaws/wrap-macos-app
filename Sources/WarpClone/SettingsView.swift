@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var ai: AIProviderManager
+    @StateObject private var copilotAuth = CopilotAuthViewModel()
 
     @State private var selectedSection = "Appearance"
     @State private var apiKey = ""
@@ -212,6 +213,10 @@ struct SettingsView: View {
                 }
             }
 
+            if preferences.aiProviderMode == AIProviderKind.copilot.rawValue {
+                copilotAuthSection
+            }
+
             settingsCard("Model") {
                 VStack(alignment: .leading, spacing: 12) {
                     ModelPickerMenu()
@@ -269,6 +274,104 @@ struct SettingsView: View {
                 }
                 Toggle("Telemetry Disabled", isOn: $preferences.telemetryDisabled)
                 Stepper("Max Image Attachments: \(preferences.maxImageAttachments)", value: $preferences.maxImageAttachments, in: 1...20)
+            }
+        }
+    }
+
+    private var copilotAuthSection: some View {
+        settingsCard("GitHub Copilot") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    if let avatarURL = copilotAuth.userAvatarURL {
+                        AsyncImage(url: avatarURL) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Circle().fill(Color.secondary.opacity(0.2))
+                        }
+                        .frame(width: 32, height: 32)
+                        .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color.secondary.opacity(0.2))
+                            .frame(width: 32, height: 32)
+                            .overlay(Image(systemName: "person.fill").foregroundStyle(.secondary))
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(copilotAuth.isLoggedIn ? (copilotAuth.userDisplayName.isEmpty ? "GitHub Copilot" : copilotAuth.userDisplayName) : "Not signed in")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(copilotAuth.isLoggedIn ? "Copilot subscription verified" : "Sign in with GitHub device flow")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Circle()
+                        .fill(copilotAuth.isLoggedIn ? Color.green : Color.orange)
+                        .frame(width: 8, height: 8)
+                }
+
+                if copilotAuth.showDeviceCode {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Enter this code on GitHub:")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 8) {
+                            Text(copilotAuth.userCode)
+                                .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                                .textSelection(.enabled)
+                            Button {
+                                copilotAuth.copyUserCode()
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Copy code")
+                        }
+                        .padding(10)
+                        .background(Color.secondary.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        if let url = URL(string: copilotAuth.verificationUri) {
+                            Link("Open GitHub device page", destination: url)
+                                .font(.system(size: 11))
+                        }
+                    }
+                }
+
+                if let error = copilotAuth.errorMessage {
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                }
+
+                HStack {
+                    Button {
+                        copilotAuth.login()
+                    } label: {
+                        if copilotAuth.isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label("Sign In", systemImage: "person.badge.key")
+                        }
+                    }
+                    .disabled(copilotAuth.isLoading || copilotAuth.isLoggedIn)
+
+                    Button(role: .destructive) {
+                        copilotAuth.logout()
+                    } label: {
+                        Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                    .disabled(!copilotAuth.isLoggedIn && !copilotAuth.isLoading)
+
+                    Spacer()
+                }
             }
         }
     }

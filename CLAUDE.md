@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Release Prep
+
+- `script/build_and_sign.sh` builds a release `.app`, signs it ad-hoc by default or with `SIGNING_ID`, optionally notarizes with `NOTARIZE=true`, and emits a DMG.
+- `script/notarize_setup.sh` stores Apple notarization credentials in a local keychain profile. Never commit Apple IDs, app-specific passwords, team IDs tied to private accounts, or signing identities as secrets.
+- `script/generate_icons.sh` creates macOS icon assets from a 1024x1024 PNG under `Sources/WarpClone/Resources/Assets.xcassets`.
+- `script/screenshot.sh` captures release screenshots into `docs/screenshots`.
+- Release docs live in `docs/BETA_TESTING.md`, `docs/DESIGN_ASSETS.md`, `PRIVACY_POLICY.md`, and `CHANGELOG.md`.
+- App bundle resources live under `Sources/WarpClone/Resources`; keep `Package.swift` resource registration in sync when adding app metadata or assets.
+- GitHub Copilot OAuth uses device flow. Configure the public OAuth client ID through `GitHubOAuthClientID` in the app bundle, `GITHUB_OAUTH_CLIENT_ID` during release bundling, or `WARPCLONE_GITHUB_CLIENT_ID` for local runs. Tokens live in Keychain via `CopilotTokenStore`; do not store Copilot OAuth tokens as provider API keys.
+
 ## Build & Test Commands
 
 ```bash
@@ -38,8 +48,8 @@ WarpClone is a dual-product Swift project: a native macOS terminal app + CLI com
   - ANSI rendering (ANSIParser.swift)
   - 21 themes (ThemeRegistry.swift)
   - MCP inspector UI (MCPManager.swift)
-  - Git review surfaces (GitService.swift)
-  - OpenRouter/BYOK AI provider integration (AIProviders.swift, AIInspectorView.swift)
+  - Git review surfaces (GitService.swift, InspectorView.swift, DiffView.swift)
+  - OpenRouter/BYOK AI provider integration (AIProviders.swift, ConversationStore.swift, AIInspectorView.swift)
 
 - **WarpCLI** (executable): Command-line companion with subcommands:
   - `ask` / `chat` / `agent` — AI requests via OpenRouter
@@ -67,7 +77,9 @@ WarpClone is a dual-product Swift project: a native macOS terminal app + CLI com
 
 **AI Output Sanitization**: `AIOutputSanitizer` (wraps `TerminalInputSanitizer`) strips OSC clipboard/window-title/DCS sequences from AI-generated text before it's stored or displayed — applied in `TerminalBlock.init`, not just PTY writes.
 
-**AI Streaming**: AIProviders implements a unified client interface over OpenRouter. Request/response models are in Models.swift. Streaming uses AsyncThrowingStream.
+**AI Streaming**: AIProviders implements a unified client interface over OpenRouter. Request/response models are in Models.swift. Streaming uses AsyncThrowingStream. TerminalDetailView routes AI-mode prompts (including literal `# prompt` input) through AIProviderManager.complete(), appending streamed tokens to both the active terminal block and ConversationStore. AIInspectorView is now a conversation panel with persistent user/assistant messages, streaming state, error display, image attachments, and fenced-code rendering/copy actions.
+
+**Code Review Diff Surface**: InspectorView's Code Review tab is a two-column review surface backed by GitService. The sidebar lists changed files, loads per-file diffs, and exposes refresh/stage/discard/open actions. DiffView renders raw git diff text with file headers, hunk headers, line numbers, green additions, red deletions, and stub hunk action buttons. TerminalDetailView shows a git diff chip above the input when GitService has uncommitted changes; tapping it opens the inspector on the Code Review tab.
 
 ### Testing
 
@@ -84,8 +96,14 @@ Tests are in `Tests/WarpCLITests` (core) and `Tests/WarpCloneTests` (UI). Focus 
 | PermissionGate.swift | Central enforcement for tool/command safety, audit logging |
 | MCPRegistry.swift | Parses claude_settings.json and settings.toml, discovers MCP servers |
 | AIProviders.swift | OpenRouter client + request streaming |
+| ConversationStore.swift | App-wide AI chat history and active streaming task state |
+| AIInspectorView.swift | AI conversation panel, composer, streaming indicator, code block rendering |
 | PTYSession.swift | PTY lifecycle, session restore, sequence sanitization |
 | TerminalPrimitives.swift | ANSI codes, terminal sizing, raw mode |
+| TerminalDetailView.swift | Terminal panes, input editor, AI streaming submission, git diff chip |
+| GitService.swift | Git branch/status/diff loading and diff summary state |
+| InspectorView.swift | AI/MCP/Code Review inspector shell and git diff review surface |
+| DiffView.swift | Raw git diff renderer with line numbers, hunk headers, and colored changes |
 | GitReviewService.swift | Review prompt generation from git context |
 | PermissionApprovalView.swift | Reusable SwiftUI approval sheet (Allow Once/Deny/Edit/Always Allow) |
 
@@ -130,3 +148,9 @@ At the start of a new session (or after `/clear`), run the `mem-search` skill (o
 - Darwin/Foundation (PTY, ANSI, terminal control)
 - SwiftUI (app UI)
 - Keychain (credential storage, via Security framework)
+
+## Recent UI Implementation Notes
+
+- Code Review comments now stream through the selected AI provider into a terminal block. When the response looks like a unified diff, `InspectorView` replaces `git.selectedDiff` so the proposed diff can be reviewed in-place.
+- Sidebar session rows support native drag reordering through `SessionStore.moveSession(from:to:)`; `VerticalTabRow` exposes a hover-only drag handle.
+- Terminal blocks fade and slide in on first appearance. Inspector toggles are wrapped in animation, and the fallback inspector uses a trailing slide transition.

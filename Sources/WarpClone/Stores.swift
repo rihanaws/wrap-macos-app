@@ -127,24 +127,46 @@ final class SessionStore: ObservableObject {
         self.activePaneID = next
     }
 
+    func moveSession(from source: IndexSet, to destination: Int) {
+        sessions.move(fromOffsets: source, toOffset: destination)
+    }
+
     func focusPane(_ id: UUID) {
         activePaneID = id
         guard let sessionIndex = selectedIndex else { return }
         sessions[sessionIndex].activePaneID = id
     }
 
-    func appendBlock(command: String, output: String, status: BlockStatus) {
+    @discardableResult
+    func appendBlock(command: String, output: String, status: BlockStatus) -> UUID? {
         guard let sessionIndex = selectedIndex,
-              let paneIndex = sessions[sessionIndex].panes.firstIndex(where: { $0.id == activePaneID }) else { return }
-        sessions[sessionIndex].panes[paneIndex].blocks.append(
-            TerminalBlock(
-                command: command,
-                rawOutput: output,
-                status: status,
-                startedAt: Date().addingTimeInterval(-1),
-                endedAt: Date()
-            )
+              let paneIndex = sessions[sessionIndex].panes.firstIndex(where: { $0.id == activePaneID }) else { return nil }
+        let block = TerminalBlock(
+            command: command,
+            rawOutput: output,
+            status: status,
+            startedAt: Date().addingTimeInterval(-1),
+            endedAt: status == .running ? nil : Date()
         )
+        sessions[sessionIndex].panes[paneIndex].blocks.append(block)
+        return block.id
+    }
+
+    func updateBlock(id: UUID, output: String? = nil, status: BlockStatus? = nil) {
+        guard let sessionIndex = selectedIndex else { return }
+        for paneIndex in sessions[sessionIndex].panes.indices {
+            guard let blockIndex = sessions[sessionIndex].panes[paneIndex].blocks.firstIndex(where: { $0.id == id }) else {
+                continue
+            }
+            if let output {
+                sessions[sessionIndex].panes[paneIndex].blocks[blockIndex].rawOutput = output
+            }
+            if let status {
+                sessions[sessionIndex].panes[paneIndex].blocks[blockIndex].status = status
+                sessions[sessionIndex].panes[paneIndex].blocks[blockIndex].endedAt = status == .running ? nil : Date()
+            }
+            return
+        }
     }
 
     func updateActiveLiveOutput(_ output: String) {

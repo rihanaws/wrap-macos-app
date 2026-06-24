@@ -28,7 +28,16 @@ struct ContentView: View {
                 commandPalette = visible
             }
             .onReceive(NotificationCenter.default.publisher(for: .toggleWarpCloneInspector)) { _ in
-                showInspector.toggle()
+                withAnimation(.easeOut(duration: 0.25)) {
+                    showInspector.toggle()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showWarpCloneCodeReview)) { _ in
+                showInspector = true
+                inspectorTab = InspectorTab.codeReview.rawValue
+                if let path = sessions.selectedSession?.workingDirectory {
+                    git.refresh(repositoryPath: path)
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .toggleWarpCloneSidebar)) { _ in
                 withAnimation(.snappy(duration: 0.18)) {
@@ -80,7 +89,9 @@ struct ContentView: View {
                     Label("Command Palette", systemImage: "command")
                 }
                 Button {
-                    showInspector.toggle()
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        showInspector.toggle()
+                    }
                 } label: {
                     Label("Inspector", systemImage: "sidebar.right")
                 }
@@ -118,6 +129,7 @@ private extension View {
                     Divider()
                     content()
                         .frame(minWidth: 300, idealWidth: 360, maxWidth: 480)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
         }

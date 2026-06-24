@@ -34,6 +34,12 @@ struct VerticalTabRow: View {
                 .foregroundStyle(.secondary)
             }
 
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+                .opacity(hovering ? 1 : 0)
+                .help("Drag to reorder")
+
             Spacer(minLength: 6)
         }
         .frame(height: 52)
